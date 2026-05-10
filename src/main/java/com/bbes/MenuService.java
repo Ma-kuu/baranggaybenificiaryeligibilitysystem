@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.Scanner;
 
 /**
- * MenuService - handles all CLI menu interactions and user input.
- * This class ties together Resident, EligibilityService, and ShellSorter.
+ * MenuService - handles CLI menu logic and user input.
+ * Delegates display to DisplayService and uses SampleData for test data.
  */
 public class MenuService {
 
@@ -13,6 +13,7 @@ public class MenuService {
     private ArrayList<Resident> residents;       // stores all registered residents
     private EligibilityService eligibility;      // checks program eligibility
     private ShellSorter sorter;                  // sorts beneficiary lists using Shell Sort
+    private DisplayService display;              // handles all table printing
     private Scanner scanner;                     // reads user input
     private int nextId;                          // auto-increment resident ID
 
@@ -22,6 +23,7 @@ public class MenuService {
         eligibility = new EligibilityService();
         sorter = new ShellSorter();
         scanner = new Scanner(System.in);
+        display = new DisplayService(scanner); // share scanner for pagination input
         nextId = 1;
     }
 
@@ -32,7 +34,10 @@ public class MenuService {
      * Loops until the user chooses to exit.
      */
     public void start() {
-        loadSampleData(); // pre-load 10 sample residents for testing
+        // Load sample data from SampleData class
+        residents = SampleData.loadSampleResidents();
+        nextId = SampleData.getNextIdAfterSample();
+
         System.out.println("\n=====================================================");
         System.out.println("   BARANGAY BENEFICIARY PRIORITIZATION SYSTEM");
         System.out.println("=====================================================");
@@ -46,10 +51,9 @@ public class MenuService {
             System.out.println("  [2] View Residents");
             System.out.println("  [3] Check Eligibility");
             System.out.println("  [4] Generate Beneficiary List");
-            System.out.println("  [5] Sort Beneficiary List");
-            System.out.println("  [6] Search Resident");
-            System.out.println("  [7] Find Most In-Need Residents");
-            System.out.println("  [8] Exit");
+            System.out.println("  [5] Search Resident");
+            System.out.println("  [6] Find Most In-Need Residents");
+            System.out.println("  [7] Exit");
             System.out.println("==================================================");
             System.out.print("  Enter choice: ");
 
@@ -60,15 +64,14 @@ public class MenuService {
                 case 2: viewResidents();            break;
                 case 3: checkEligibility();         break;
                 case 4: generateBeneficiaryList();  break;
-                case 5: sortBeneficiaryList();      break;
-                case 6: searchResident();           break;
-                case 7: findMostInNeed();           break;
-                case 8:
+                case 5: searchResident();           break;
+                case 6: findMostInNeed();           break;
+                case 7:
                     running = false;
                     System.out.println("\n  Thank you for using the system. Goodbye!\n");
                     break;
                 default:
-                    System.out.println("  [!] Invalid choice. Please enter 1-8.");
+                    System.out.println("  [!] Invalid choice. Please enter 1-7.");
             }
         }
     }
@@ -130,7 +133,7 @@ public class MenuService {
                 dependentChildren, academicAvg, childOfSoloParent, childOfOfwOwwa);
 
         residents.add(resident);
-        System.out.println("\n  [✓] Resident registered successfully! ID: " + nextId);
+        System.out.println("\n  [+] Resident registered successfully! ID: " + nextId);
         nextId++;
     }
 
@@ -147,7 +150,7 @@ public class MenuService {
             return;
         }
 
-        displayResidentTable(residents);
+        display.displayResidentTable(residents);
     }
 
     // ==================== 3. Check Eligibility ====================
@@ -202,7 +205,7 @@ public class MenuService {
                 ArrayList<Resident> qualified = eligibility.getQualifiedResidents(residents, programNumber);
 
                 // Sort by income ascending using Shell Sort (lowest income = highest priority)
-                ArrayList<Resident> sorted = sorter.sortByIncomeAscending(qualified);
+                ArrayList<Resident> sorted = sorter.shellSort(qualified, (r1, r2) -> Double.compare(r1.getHouseholdIncome(), r2.getHouseholdIncome()));
 
                 // Find this resident's rank in the sorted list
                 int rank = 1;
@@ -214,7 +217,7 @@ public class MenuService {
                 }
 
                 System.out.printf("  | %-3d | %-52s | %-4d | %-5d |%n",
-                        (i + 1), truncate(programName, 52), rank, sorted.size());
+                        (i + 1), display.truncate(programName, 52), rank, sorted.size());
             }
 
             System.out.println("  +-----+------------------------------------------------------+------+-------+");
@@ -236,7 +239,7 @@ public class MenuService {
             System.out.println("  | No. | Program                                              |");
             System.out.println("  +-----+------------------------------------------------------+");
             for (int i = 0; i < ineligible.size(); i++) {
-                System.out.printf("  | %-3d | %-52s |%n", (i + 1), truncate(ineligible.get(i), 52));
+                System.out.printf("  | %-3d | %-52s |%n", (i + 1), display.truncate(ineligible.get(i), 52));
             }
             System.out.println("  +-----+------------------------------------------------------+");
         }
@@ -245,8 +248,8 @@ public class MenuService {
     // ==================== 4. Generate Beneficiary List ====================
 
     /**
-     * Lets the user pick a program, then displays all eligible residents.
-     * Results are automatically sorted by household income (ascending) using Shell Sort.
+     * Lets the user pick a program, choose a sorting criteria, then displays
+     * all eligible residents sorted using Shell Sort.
      */
     private void generateBeneficiaryList() {
         System.out.println("\n============ GENERATE BENEFICIARY LIST =============");
@@ -256,7 +259,7 @@ public class MenuService {
             return;
         }
 
-        displayProgramMenu();
+        display.displayProgramMenu(eligibility);
         System.out.print("  Select program (1-11): ");
         int choice = readInt();
 
@@ -276,46 +279,7 @@ public class MenuService {
             return;
         }
 
-        // Sort by income ascending using Shell Sort (prioritize lowest income)
-        qualified = sorter.sortByIncomeAscending(qualified);
-
-        System.out.println("\n  (Sorted by household income, lowest first - via Shell Sort)\n");
-        displayBeneficiaryTable(qualified);
-    }
-
-    // ==================== 5. Sort Beneficiary List ====================
-
-    /**
-     * Lets the user pick a program, then choose a sorting criteria.
-     * Uses Shell Sort for all sorting operations.
-     */
-    private void sortBeneficiaryList() {
-        System.out.println("\n============= SORT BENEFICIARY LIST ================");
-
-        if (residents.isEmpty()) {
-            System.out.println("  No residents registered yet.");
-            return;
-        }
-
-        displayProgramMenu();
-        System.out.print("  Select program (1-11): ");
-        int programChoice = readInt();
-
-        if (programChoice < 1 || programChoice > 11) {
-            System.out.println("  [!] Invalid program number.");
-            return;
-        }
-
-        ArrayList<Resident> qualified = eligibility.getQualifiedResidents(residents, programChoice);
-
-        if (qualified.isEmpty()) {
-            System.out.println("  No qualified residents for this program.");
-            return;
-        }
-
-        System.out.println("\n  Program: " + eligibility.getProgramName(programChoice));
-        System.out.println("  Qualified Residents: " + qualified.size());
-
+        // Ask user how to sort the beneficiary list
         System.out.println("\n  Sort By:");
         System.out.println("  [1] Household Income (ascending)");
         System.out.println("  [2] Age (ascending)");
@@ -329,19 +293,19 @@ public class MenuService {
 
         switch (sortChoice) {
             case 1:
-                sorted = sorter.sortByIncomeAscending(qualified);
+                sorted = sorter.shellSort(qualified, (r1, r2) -> Double.compare(r1.getHouseholdIncome(), r2.getHouseholdIncome()));
                 sortLabel = "Household Income (Ascending)";
                 break;
             case 2:
-                sorted = sorter.sortByAgeAscending(qualified);
+                sorted = sorter.shellSort(qualified, (r1, r2) -> Integer.compare(r1.getAge(), r2.getAge()));
                 sortLabel = "Age (Ascending)";
                 break;
             case 3:
-                sorted = sorter.sortByFamilySizeDescending(qualified);
+                sorted = sorter.shellSort(qualified, (r1, r2) -> Integer.compare(r2.getFamilySize(), r1.getFamilySize())); // Descending
                 sortLabel = "Family Size (Descending)";
                 break;
             case 4:
-                sorted = sorter.sortByNameAlphabetical(qualified);
+                sorted = sorter.shellSort(qualified, (r1, r2) -> r1.getFullName().compareToIgnoreCase(r2.getFullName()));
                 sortLabel = "Name (Alphabetical)";
                 break;
             default:
@@ -350,10 +314,10 @@ public class MenuService {
         }
 
         System.out.println("\n  Sorted by: " + sortLabel + " (using Shell Sort)\n");
-        displayBeneficiaryTable(sorted);
+        display.displayBeneficiaryTable(sorted);
     }
 
-    // ==================== 6. Search Resident ====================
+    // ==================== 5. Search Resident ====================
 
     /**
      * Searches for a resident by ID or full name.
@@ -379,7 +343,7 @@ public class MenuService {
 
             if (found != null) {
                 System.out.println("\n  [+] Resident found!");
-                displayResidentDetail(found);
+                display.displayResidentDetail(found);
             } else {
                 System.out.println("  [!] No resident found with ID " + id);
             }
@@ -394,12 +358,44 @@ public class MenuService {
             } else {
                 System.out.println("\n  [+] Found " + results.size() + " result(s):");
                 for (Resident r : results) {
-                    displayResidentDetail(r);
+                    display.displayResidentDetail(r);
                 }
             }
         } else {
             System.out.println("  [!] Invalid choice.");
         }
+    }
+
+    // ==================== 6. Find Most In-Need Residents ====================
+
+    /**
+     * Ranks ALL residents by their "need score" using Shell Sort.
+     * The need score is computed based on income, family size, vulnerability flags,
+     * and number of eligible programs. Higher score = more in need.
+     *
+     * Shell Sort is used here to sort all residents by need score in descending order,
+     * so the most in-need residents appear at the top.
+     */
+    private void findMostInNeed() {
+        System.out.println("\n============= MOST IN-NEED RESIDENTS ===============");
+
+        if (residents.isEmpty()) {
+            System.out.println("  No residents registered yet.");
+            return;
+        }
+
+        // Sort all residents by need score (descending) using Shell Sort
+        ArrayList<Resident> sorted = sorter.shellSort(residents, (r1, r2) -> {
+            int score1 = eligibility.calculateNeedScore(r1);
+            int score2 = eligibility.calculateNeedScore(r2);
+            return Integer.compare(score2, score1); // Descending
+        });
+
+        System.out.println("  Residents ranked by need score (highest = most in need)");
+        System.out.println("  Score factors: income, family size, PWD, senior, solo parent,");
+        System.out.println("  unemployed, dependent children, eligible program count\n");
+
+        display.displayNeedScoreTable(sorted, eligibility);
     }
 
     // ==================== Helper Methods ====================
@@ -423,96 +419,6 @@ public class MenuService {
             }
         }
         return results;
-    }
-
-    /** Display the list of all available programs. */
-    private void displayProgramMenu() {
-        System.out.println("\n  Available Programs:");
-        String[] programs = eligibility.getAllProgramNames();
-        for (int i = 0; i < programs.length; i++) {
-            System.out.println("  [" + (i + 1) + "] " + programs[i]);
-        }
-    }
-
-    /** Display a compact table of all residents with key info and flags. */
-    private void displayResidentTable(ArrayList<Resident> list) {
-        System.out.println("  +-----+-----------------------+-----+--------------+------+-----------------+-----+-----+-----+-----+-----+");
-        System.out.println("  | ID  | Name                  | Age | Income (Php) | Fam. | Occupation      | Stu | Uem | SP  | SC  | PWD |");
-        System.out.println("  +-----+-----------------------+-----+--------------+------+-----------------+-----+-----+-----+-----+-----+");
-
-        for (Resident r : list) {
-            System.out.printf("  | %-3d | %-21s | %-3d | %12s | %-4d | %-15s | %-3s | %-3s | %-3s | %-3s | %-3s |%n",
-                    r.getResidentId(),
-                    truncate(r.getFullName(), 21),
-                    r.getAge(),
-                    String.format("%,.2f", r.getHouseholdIncome()),
-                    r.getFamilySize(),
-                    truncate(r.getOccupation(), 15),
-                    yn(r.isStudent()), yn(r.isUnemployed()), yn(r.isSoloParent()),
-                    yn(r.isSeniorCitizen()), yn(r.isPwd()));
-        }
-
-        System.out.println("  +-----+-----------------------+-----+--------------+------+-----------------+-----+-----+-----+-----+-----+");
-        System.out.println("  Legend: Stu=Student | Uem=Unemployed | SP=Solo Parent | SC=Senior Citizen | PWD=PWD");
-        System.out.println("  Total: " + list.size() + " resident(s)");
-    }
-
-    /** Display a table of beneficiaries with key details (for program lists). */
-    private void displayBeneficiaryTable(ArrayList<Resident> list) {
-        System.out.println("  +------+-----+--------------------------+------+--------------+-----------+");
-        System.out.println("  | Rank | ID  | Name                     | Age  | Income (Php) | Fam. Size |");
-        System.out.println("  +------+-----+--------------------------+------+--------------+-----------+");
-
-        for (int i = 0; i < list.size(); i++) {
-            Resident r = list.get(i);
-            System.out.printf("  | %-4d | %-3d | %-24s | %-4d | %12s | %-9d |%n",
-                    (i + 1),
-                    r.getResidentId(),
-                    truncate(r.getFullName(), 24),
-                    r.getAge(),
-                    String.format("%,.2f", r.getHouseholdIncome()),
-                    r.getFamilySize());
-        }
-
-        System.out.println("  +------+-----+--------------------------+------+--------------+-----------+");
-        System.out.println("  Total: " + list.size() + " beneficiar" + (list.size() == 1 ? "y" : "ies"));
-    }
-
-    /**
-     * Display a compact detail view of a single resident.
-     * Used by Search Resident to show full details in a structured format.
-     */
-    private void displayResidentDetail(Resident r) {
-        System.out.println("  +--------------------+----------------------------+");
-        System.out.printf("  | %-18s | %-26s |%n", "Resident ID", r.getResidentId());
-        System.out.printf("  | %-18s | %-26s |%n", "Full Name", r.getFullName());
-        System.out.printf("  | %-18s | %-26s |%n", "Age", r.getAge());
-        System.out.printf("  | %-18s | %-26s |%n", "Household Income", "Php " + String.format("%,.2f", r.getHouseholdIncome()));
-        System.out.printf("  | %-18s | %-26s |%n", "Family Size", r.getFamilySize());
-        System.out.printf("  | %-18s | %-26s |%n", "Occupation", r.getOccupation());
-        System.out.printf("  | %-18s | %-26s |%n", "Student", yn(r.isStudent()));
-        System.out.printf("  | %-18s | %-26s |%n", "Unemployed", yn(r.isUnemployed()));
-        System.out.printf("  | %-18s | %-26s |%n", "Solo Parent", yn(r.isSoloParent()));
-        System.out.printf("  | %-18s | %-26s |%n", "Senior Citizen", yn(r.isSeniorCitizen()));
-        System.out.printf("  | %-18s | %-26s |%n", "PWD", yn(r.isPwd()));
-        System.out.printf("  | %-18s | %-26s |%n", "Dependent Children", yn(r.hasDependentChildren()));
-        System.out.printf("  | %-18s | %-26s |%n", "Academic Average", r.getAcademicAverage());
-        System.out.printf("  | %-18s | %-26s |%n", "Child of Solo Par.", yn(r.isChildOfSoloParent()));
-        System.out.printf("  | %-18s | %-26s |%n", "Child of OFW/OWWA", yn(r.isChildOfOfwOwwa()));
-        System.out.println("  +--------------------+----------------------------+");
-    }
-
-    /** Truncate a string to a maximum length. */
-    private String truncate(String text, int maxLength) {
-        if (text.length() <= maxLength) {
-            return text;
-        }
-        return text.substring(0, maxLength - 3) + "...";
-    }
-
-    /** Helper: converts boolean to "Y" or "N" for compact display. */
-    private String yn(boolean value) {
-        return value ? "Y" : "N";
     }
 
     // ==================== Input Validation ====================
@@ -544,53 +450,5 @@ public class MenuService {
         System.out.print(prompt);
         String input = scanner.nextLine().trim().toLowerCase();
         return input.equals("yes") || input.equals("y");
-    }
-
-    // ==================== Sample Test Data ====================
-
-    /**
-     * Pre-loads 10 sample residents for testing and demonstration.
-     * These residents cover a variety of eligibility scenarios.
-     */
-    private void loadSampleData() {
-        // Resident 1: Low-income mother with dependent children (eligible for 4Ps, AKAP)
-        residents.add(new Resident(nextId++, "Maria Santos", 34, 8000, 6, "Vendor",
-                false, false, false, false, false, true, 0, false, false));
-
-        // Resident 2: Student from low-income family (eligible for SPES, Educational Cash)
-        residents.add(new Resident(nextId++, "Juan Dela Cruz", 19, 15000, 5, "Student",
-                true, false, false, false, false, false, 88, false, false));
-
-        // Resident 3: Unemployed adult (eligible for TUPAD)
-        residents.add(new Resident(nextId++, "Pedro Reyes", 45, 10000, 4, "None",
-                false, true, false, false, false, true, 0, false, false));
-
-        // Resident 4: Solo parent (eligible for Solo Parent Benefits)
-        residents.add(new Resident(nextId++, "Ana Garcia", 38, 18000, 3, "Teacher",
-                false, false, true, false, false, true, 0, false, false));
-
-        // Resident 5: Senior citizen (eligible for Senior Pension)
-        residents.add(new Resident(nextId++, "Lolo Ernesto Bautista", 72, 5000, 2, "Retired",
-                false, false, false, true, false, false, 0, false, false));
-
-        // Resident 6: PWD student, child of solo parent (eligible for PWD Assistance, Bagong Pilipinas with priority)
-        residents.add(new Resident(nextId++, "Carlo Mendoza", 20, 12000, 4, "Student",
-                true, false, false, false, true, false, 92, true, false));
-
-        // Resident 7: Farmer (eligible for Farmer Assistance)
-        residents.add(new Resident(nextId++, "Mang Tonyo Villanueva", 55, 9500, 5, "Rice Farmer",
-                false, false, false, false, false, true, 0, false, false));
-
-        // Resident 8: Student child of OFW (eligible for OWWA Scholarship)
-        residents.add(new Resident(nextId++, "Lisa Ramos", 17, 25000, 4, "Student",
-                true, false, false, false, false, false, 90, false, true));
-
-        // Resident 9: Low-income student with high grades (eligible for Bagong Pilipinas, SPES, Educational Cash)
-        residents.add(new Resident(nextId++, "Mark Rivera", 21, 11000, 7, "Student",
-                true, false, false, false, false, false, 95, false, false));
-
-        // Resident 10: Senior PWD solo parent (eligible for multiple programs)
-        residents.add(new Resident(nextId++, "Lola Carmen Aquino", 65, 7000, 3, "None",
-                false, true, true, true, true, true, 0, false, false));
     }
 }
