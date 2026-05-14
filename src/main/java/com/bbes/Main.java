@@ -1,19 +1,10 @@
 package com.bbes;
 
 /**
- * Main class - entry point for the Barangay Beneficiary Prioritization System.
+ * Entry point for the Barangay Beneficiary Prioritization System (BBES).
  *
- * This system:
- * 1. Stores barangay resident records using ArrayList (in-memory only).
- * 2. Checks eligibility for 11 Philippine government assistance programs.
- * 3. Generates and prioritizes beneficiary lists using Shell Sort algorithm.
- *
- * Classes:
- * - Resident          : stores resident data (model)
- * - EligibilityService: contains eligibility rules for all programs
- * - ShellSorter       : implements Shell Sort for sorting beneficiary lists
- * - MenuService       : handles CLI menu and user interaction
- * - Main              : entry point
+ * Checks resident eligibility for 11 Philippine government programs
+ * and uses Shell Sort to rank and prioritize beneficiaries.
  */
 public class Main {
     public static void main(String[] args) {

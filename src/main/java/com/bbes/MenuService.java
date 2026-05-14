@@ -1,47 +1,44 @@
 package com.bbes;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Scanner;
 
-/**
- * MenuService - handles CLI menu logic and user input.
- * Delegates display to DisplayService and uses SampleData for test data.
- */
+// Handles the CLI menu, user input, and all menu actions.
 public class MenuService {
 
-    // Core components
-    private ArrayList<Resident> residents;       // stores all registered residents
-    private EligibilityService eligibility;      // checks program eligibility
-    private ShellSorter sorter;                  // sorts beneficiary lists using Shell Sort
-    private DisplayService display;              // handles all table printing
-    private Scanner scanner;                     // reads user input
-    private int nextId;                          // auto-increment resident ID
+    private static final int MAX_RESIDENTS = 200;
 
-    // ==================== Constructor ====================
+    // core components
+    private Resident[] residents;
+    private int count;
+    private EligibilityService eligibility;
+    private ShellSorter sorter;
+    private DisplayService display;
+    private Scanner scanner;
+    private int nextId;
+
+    // constructor
     public MenuService() {
-        residents = new ArrayList<>();
+        residents  = new Resident[MAX_RESIDENTS];
+        count      = 0;
         eligibility = new EligibilityService();
-        sorter = new ShellSorter();
-        scanner = new Scanner(System.in);
-        display = new DisplayService(scanner); // share scanner for pagination input
-        nextId = 1;
+        sorter     = new ShellSorter();
+        scanner    = new Scanner(System.in);
+        display    = new DisplayService(scanner);
+        nextId     = 1;
     }
 
-    // ==================== Main Menu ====================
-
-    /**
-     * Displays the main menu and handles user choices.
-     * Loops until the user chooses to exit.
-     */
+    // main menu
     public void start() {
-        // Load sample data from SampleData class
-        residents = SampleData.loadSampleResidents();
+        Resident[] sample = SampleData.loadSampleResidents();
+        System.arraycopy(sample, 0, residents, 0, sample.length);
+        count  = sample.length;
         nextId = SampleData.getNextIdAfterSample();
 
         System.out.println("\n=====================================================");
         System.out.println("   BARANGAY BENEFICIARY PRIORITIZATION SYSTEM");
         System.out.println("=====================================================");
-        System.out.println(" Sample data loaded: " + residents.size() + " residents registered.\n");
+        System.out.println(" Sample data loaded: " + count + " residents registered.\n");
 
         boolean running = true;
 
@@ -53,36 +50,39 @@ public class MenuService {
             System.out.println("  [4] Generate Beneficiary List");
             System.out.println("  [5] Search Resident");
             System.out.println("  [6] Find Most In-Need Residents");
-            System.out.println("  [7] Exit");
+            System.out.println("  [7] Delete Resident");
+            System.out.println("  [8] Exit");
             System.out.println("==================================================");
             System.out.print("  Enter choice: ");
 
             int choice = readInt();
 
             switch (choice) {
-                case 1: registerResident();         break;
-                case 2: viewResidents();            break;
-                case 3: checkEligibility();         break;
-                case 4: generateBeneficiaryList();  break;
-                case 5: searchResident();           break;
-                case 6: findMostInNeed();           break;
-                case 7:
+                case 1: registerResident();        break;
+                case 2: viewResidents();           break;
+                case 3: checkEligibility();        break;
+                case 4: generateBeneficiaryList(); break;
+                case 5: searchResident();          break;
+                case 6: findMostInNeed();          break;
+                case 7: deleteResident();          break;
+                case 8:
                     running = false;
                     System.out.println("\n  Thank you for using the system. Goodbye!\n");
                     break;
                 default:
-                    System.out.println("  [!] Invalid choice. Please enter 1-7.");
+                    System.out.println("  [!] Invalid choice. Please enter 1-8.");
             }
         }
     }
 
-    // ==================== 1. Register Resident ====================
-
-    /**
-     * Collects resident information from the user and adds a new Resident.
-     */
+    // 1. register resident
     private void registerResident() {
         System.out.println("\n============= REGISTER NEW RESIDENT ==============");
+
+        if (count >= MAX_RESIDENTS) {
+            System.out.println("  [!] Resident list is full (max " + MAX_RESIDENTS + ").");
+            return;
+        }
 
         System.out.print("  Full Name: ");
         String name = scanner.nextLine().trim();
@@ -128,47 +128,33 @@ public class MenuService {
         boolean childOfSoloParent = readYesNo("  Child of Solo Parent (yes/no): ");
         boolean childOfOfwOwwa    = readYesNo("  Child of OFW/OWWA Member (yes/no): ");
 
-        Resident resident = new Resident(nextId, name, age, income, familySize, occupation,
+        residents[count] = new Resident(nextId, name, age, income, familySize, occupation,
                 student, unemployed, soloParent, seniorCitizen, pwd,
                 dependentChildren, academicAvg, childOfSoloParent, childOfOfwOwwa);
+        count++;
 
-        residents.add(resident);
         System.out.println("\n  [+] Resident registered successfully! ID: " + nextId);
         nextId++;
     }
 
-    // ==================== 2. View Residents ====================
-
-    /**
-     * Displays all registered residents in a compact table.
-     */
+    // 2. view all residents
     private void viewResidents() {
         System.out.println("\n===================== ALL REGISTERED RESIDENTS =====================");
 
-        if (residents.isEmpty()) {
+        if (count == 0) {
             System.out.println("  No residents registered yet.");
             return;
         }
 
-        display.displayResidentTable(residents);
+        // pass only the filled portion of the array
+        display.displayResidentTable(Arrays.copyOf(residents, count));
     }
 
-    // ==================== 3. Check Eligibility ====================
-
-    /**
-     * Checks which programs a specific resident is eligible/ineligible for.
-     * Uses Shell Sort to determine the resident's priority rank in each eligible program.
-     *
-     * How Shell Sort is used here:
-     * - For each program the resident qualifies for, we gather ALL qualified residents.
-     * - We sort them by household income (ascending) using Shell Sort.
-     * - We then find where this resident falls in the sorted list = their priority rank.
-     * - Lower income = higher priority (rank 1 = most in need).
-     */
+    // 3. check eligibility for a specific resident
     private void checkEligibility() {
         System.out.println("\n==================== CHECK ELIGIBILITY ====================");
 
-        if (residents.isEmpty()) {
+        if (count == 0) {
             System.out.println("  No residents registered yet.");
             return;
         }
@@ -184,77 +170,68 @@ public class MenuService {
 
         System.out.println("\n  Resident: " + resident.getFullName() + " (ID: " + id + ")");
 
-        // Get eligible programs and display as table with priority rank
-        ArrayList<String> eligible = eligibility.getEligiblePrograms(resident);
+        // get eligible programs and display with priority rank (Shell Sort used here)
+        String[] eligible = eligibility.getEligiblePrograms(resident);
         System.out.println("\n  ELIGIBLE PROGRAMS (priority rank via Shell Sort):");
 
-        if (eligible.isEmpty()) {
+        if (eligible.length == 0) {
             System.out.println("  None");
         } else {
             System.out.println("  +-----+------------------------------------------------------+------+-------+");
             System.out.println("  | No. | Program                                              | Rank | Total |");
             System.out.println("  +-----+------------------------------------------------------+------+-------+");
 
-            for (int i = 0; i < eligible.size(); i++) {
-                String programName = eligible.get(i);
+            for (int i = 0; i < eligible.length; i++) {
+                String programName  = eligible[i];
+                int programNumber   = eligibility.getProgramNumber(programName);
 
-                // Get the program number so we can find all qualified residents
-                int programNumber = eligibility.getProgramNumber(programName);
+                // get all qualified residents and sort by income using Shell Sort
+                Resident[] qualified = eligibility.getQualifiedResidents(residents, count, programNumber);
+                Resident[] sorted    = sorter.shellSort(qualified, (r1, r2) ->
+                        Double.compare(r1.getHouseholdIncome(), r2.getHouseholdIncome()));
 
-                // Get all qualified residents for this program
-                ArrayList<Resident> qualified = eligibility.getQualifiedResidents(residents, programNumber);
-
-                // Sort by income ascending using Shell Sort (lowest income = highest priority)
-                ArrayList<Resident> sorted = sorter.shellSort(qualified, (r1, r2) -> Double.compare(r1.getHouseholdIncome(), r2.getHouseholdIncome()));
-
-                // Find this resident's rank in the sorted list
+                // find this resident's rank in the sorted array
                 int rank = 1;
-                for (int j = 0; j < sorted.size(); j++) {
-                    if (sorted.get(j).getResidentId() == id) {
-                        rank = j + 1; // rank is 1-based
+                for (int j = 0; j < sorted.length; j++) {
+                    if (sorted[j].getResidentId() == id) {
+                        rank = j + 1;
                         break;
                     }
                 }
 
                 System.out.printf("  | %-3d | %-52s | %-4d | %-5d |%n",
-                        (i + 1), display.truncate(programName, 52), rank, sorted.size());
+                        (i + 1), display.truncate(programName, 52), rank, sorted.length);
             }
 
             System.out.println("  +-----+------------------------------------------------------+------+-------+");
         }
 
-        // Check Bagong Pilipinas priority
         if (eligibility.isEligibleBagongPilipinas(resident) && eligibility.hasBagongPilipinasPriority(resident)) {
             System.out.println("  * Priority for Bagong Pilipinas Scholarship (PWD/Child of Solo Parent)");
         }
 
-        // Get ineligible programs as a simple numbered table
-        ArrayList<String> ineligible = eligibility.getIneligiblePrograms(resident);
+        // ineligible programs
+        String[] ineligible = eligibility.getIneligiblePrograms(resident);
         System.out.println("\n  INELIGIBLE PROGRAMS:");
 
-        if (ineligible.isEmpty()) {
+        if (ineligible.length == 0) {
             System.out.println("  None");
         } else {
             System.out.println("  +-----+------------------------------------------------------+");
             System.out.println("  | No. | Program                                              |");
             System.out.println("  +-----+------------------------------------------------------+");
-            for (int i = 0; i < ineligible.size(); i++) {
-                System.out.printf("  | %-3d | %-52s |%n", (i + 1), display.truncate(ineligible.get(i), 52));
+            for (int i = 0; i < ineligible.length; i++) {
+                System.out.printf("  | %-3d | %-52s |%n", (i + 1), display.truncate(ineligible[i], 52));
             }
             System.out.println("  +-----+------------------------------------------------------+");
         }
     }
 
-    // ==================== 4. Generate Beneficiary List ====================
-
-    /**
-     * Lets the user pick a program, choose a sorting criteria, then displays
-     * all eligible residents sorted using Shell Sort.
-     */
+    // 4. generate sorted beneficiary list for a program
     private void generateBeneficiaryList() {
         System.out.println("\n============ GENERATE BENEFICIARY LIST =============");
 
-        if (residents.isEmpty()) {
+        if (count == 0) {
             System.out.println("  No residents registered yet.");
             return;
         }
@@ -268,18 +245,16 @@ public class MenuService {
             return;
         }
 
-        // Get all qualified residents for the selected program
-        ArrayList<Resident> qualified = eligibility.getQualifiedResidents(residents, choice);
+        Resident[] qualified = eligibility.getQualifiedResidents(residents, count, choice);
 
         System.out.println("\n  Program: " + eligibility.getProgramName(choice));
-        System.out.println("  Qualified Residents: " + qualified.size());
+        System.out.println("  Qualified Residents: " + qualified.length);
 
-        if (qualified.isEmpty()) {
+        if (qualified.length == 0) {
             System.out.println("  No qualified residents for this program.");
             return;
         }
 
-        // Ask user how to sort the beneficiary list
         System.out.println("\n  Sort By:");
         System.out.println("  [1] Household Income (ascending)");
         System.out.println("  [2] Age (ascending)");
@@ -288,24 +263,24 @@ public class MenuService {
         System.out.print("  Enter sort choice: ");
         int sortChoice = readInt();
 
-        ArrayList<Resident> sorted;
+        Resident[] sorted;
         String sortLabel;
 
         switch (sortChoice) {
             case 1:
-                sorted = sorter.shellSort(qualified, (r1, r2) -> Double.compare(r1.getHouseholdIncome(), r2.getHouseholdIncome()));
+                sorted    = sorter.shellSort(qualified, (r1, r2) -> Double.compare(r1.getHouseholdIncome(), r2.getHouseholdIncome()));
                 sortLabel = "Household Income (Ascending)";
                 break;
             case 2:
-                sorted = sorter.shellSort(qualified, (r1, r2) -> Integer.compare(r1.getAge(), r2.getAge()));
+                sorted    = sorter.shellSort(qualified, (r1, r2) -> Integer.compare(r1.getAge(), r2.getAge()));
                 sortLabel = "Age (Ascending)";
                 break;
             case 3:
-                sorted = sorter.shellSort(qualified, (r1, r2) -> Integer.compare(r2.getFamilySize(), r1.getFamilySize())); // Descending
+                sorted    = sorter.shellSort(qualified, (r1, r2) -> Integer.compare(r2.getFamilySize(), r1.getFamilySize()));
                 sortLabel = "Family Size (Descending)";
                 break;
             case 4:
-                sorted = sorter.shellSort(qualified, (r1, r2) -> r1.getFullName().compareToIgnoreCase(r2.getFullName()));
+                sorted    = sorter.shellSort(qualified, (r1, r2) -> r1.getFullName().compareToIgnoreCase(r2.getFullName()));
                 sortLabel = "Name (Alphabetical)";
                 break;
             default:
@@ -317,15 +292,11 @@ public class MenuService {
         display.displayBeneficiaryTable(sorted);
     }
 
-    // ==================== 5. Search Resident ====================
-
-    /**
-     * Searches for a resident by ID or full name.
-     */
+    // 5. search resident by ID or name
     private void searchResident() {
         System.out.println("\n==================== SEARCH RESIDENT ====================");
 
-        if (residents.isEmpty()) {
+        if (count == 0) {
             System.out.println("  No residents registered yet.");
             return;
         }
@@ -350,13 +321,13 @@ public class MenuService {
 
         } else if (choice == 2) {
             System.out.print("  Enter Full Name: ");
-            String name = scanner.nextLine().trim();
-            ArrayList<Resident> results = findByName(name);
+            String name    = scanner.nextLine().trim();
+            Resident[] results = findByName(name);
 
-            if (results.isEmpty()) {
+            if (results.length == 0) {
                 System.out.println("  [!] No resident found matching \"" + name + "\"");
             } else {
-                System.out.println("\n  [+] Found " + results.size() + " result(s):");
+                System.out.println("\n  [+] Found " + results.length + " result(s):");
                 for (Resident r : results) {
                     display.displayResidentDetail(r);
                 }
@@ -366,29 +337,20 @@ public class MenuService {
         }
     }
 
-    // ==================== 6. Find Most In-Need Residents ====================
-
-    /**
-     * Ranks ALL residents by their "need score" using Shell Sort.
-     * The need score is computed based on income, family size, vulnerability flags,
-     * and number of eligible programs. Higher score = more in need.
-     *
-     * Shell Sort is used here to sort all residents by need score in descending order,
-     * so the most in-need residents appear at the top.
-     */
+    // 6. rank all residents by need score
     private void findMostInNeed() {
         System.out.println("\n============= MOST IN-NEED RESIDENTS ===============");
 
-        if (residents.isEmpty()) {
+        if (count == 0) {
             System.out.println("  No residents registered yet.");
             return;
         }
 
-        // Sort all residents by need score (descending) using Shell Sort
-        ArrayList<Resident> sorted = sorter.shellSort(residents, (r1, r2) -> {
+        // sort all residents by need score descending using Shell Sort
+        Resident[] sorted = sorter.shellSort(Arrays.copyOf(residents, count), (r1, r2) -> {
             int score1 = eligibility.calculateNeedScore(r1);
             int score2 = eligibility.calculateNeedScore(r2);
-            return Integer.compare(score2, score1); // Descending
+            return Integer.compare(score2, score1); // descending
         });
 
         System.out.println("  Residents ranked by need score (highest = most in need)");
@@ -398,32 +360,73 @@ public class MenuService {
         display.displayNeedScoreTable(sorted, eligibility);
     }
 
-    // ==================== Helper Methods ====================
+    // 7. delete a resident by ID
+    private void deleteResident() {
+        System.out.println("\n================ DELETE RESIDENT ================");
 
-    /** Find a resident by their ID. */
-    private Resident findById(int id) {
-        for (Resident r : residents) {
-            if (r.getResidentId() == id) {
-                return r;
+        if (count == 0) {
+            System.out.println("  No residents registered yet.");
+            return;
+        }
+
+        System.out.print("  Enter Resident ID to delete: ");
+        int id = readInt();
+
+        // find the index of the resident to delete
+        int indexToDelete = -1;
+        for (int i = 0; i < count; i++) {
+            if (residents[i].getResidentId() == id) {
+                indexToDelete = i;
+                break;
             }
+        }
+
+        if (indexToDelete == -1) {
+            System.out.println("  [!] Resident not found.");
+            return;
+        }
+
+        Resident found = residents[indexToDelete];
+        System.out.println("  Found: " + found.getFullName()
+                + " | Age: " + found.getAge()
+                + " | Income: Php " + String.format("%,.2f", found.getHouseholdIncome()));
+        boolean confirm = readYesNo("  Confirm delete? (yes/no): ");
+
+        if (confirm) {
+            // shift all elements left to fill the gap
+            for (int i = indexToDelete; i < count - 1; i++) {
+                residents[i] = residents[i + 1];
+            }
+            residents[count - 1] = null; // clear the last slot
+            count--;
+            System.out.println("  [+] Resident deleted successfully.");
+        } else {
+            System.out.println("  Cancelled.");
+        }
+    }
+
+    // helper methods
+
+    private Resident findById(int id) {
+        for (int i = 0; i < count; i++) {
+            if (residents[i].getResidentId() == id) return residents[i];
         }
         return null;
     }
 
-    /** Find residents whose name contains the search string (case-insensitive). */
-    private ArrayList<Resident> findByName(String name) {
-        ArrayList<Resident> results = new ArrayList<>();
-        for (Resident r : residents) {
-            if (r.getFullName().toLowerCase().contains(name.toLowerCase())) {
-                results.add(r);
+    private Resident[] findByName(String name) {
+        Resident[] results = new Resident[count];
+        int r = 0;
+        for (int i = 0; i < count; i++) {
+            if (residents[i].getFullName().toLowerCase().contains(name.toLowerCase())) {
+                results[r++] = residents[i];
             }
         }
-        return results;
+        return Arrays.copyOf(results, r);
     }
 
-    // ==================== Input Validation ====================
+    // input validation helpers
 
-    /** Read an integer safely. Returns -1 if input is invalid. */
     private int readInt() {
         try {
             String input = scanner.nextLine().trim();
@@ -434,7 +437,6 @@ public class MenuService {
         }
     }
 
-    /** Read a double safely. Returns -1 if input is invalid. */
     private double readDouble() {
         try {
             String input = scanner.nextLine().trim();
@@ -445,7 +447,6 @@ public class MenuService {
         }
     }
 
-    /** Read a yes/no input. Returns true for yes, false for anything else. */
     private boolean readYesNo(String prompt) {
         System.out.print(prompt);
         String input = scanner.nextLine().trim().toLowerCase();

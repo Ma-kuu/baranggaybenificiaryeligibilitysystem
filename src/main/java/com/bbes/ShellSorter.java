@@ -1,50 +1,35 @@
 package com.bbes;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 
 /**
- * ShellSorter - implements the Shell Sort algorithm for sorting beneficiary lists.
+ * Shell Sort - sorts a Resident array using a gap that halves each pass.
  *
- * Shell Sort is an optimization of Insertion Sort. It works by comparing elements
- * that are far apart first, then progressively reducing the gap between elements.
- * This allows elements to move to their correct position faster than regular
- * Insertion Sort, which only compares adjacent elements.
+ * Example (sorting [8, 3, 5, 1] ascending):
+ *   gap=2: [5, 1, 8, 3]  ->  gap=1: [1, 3, 5, 8]
  *
- * Time Complexity: O(n^2) worst case, but much better in practice.
- * This class uses a single generic method with a Comparator to allow sorting by any field.
+ * Time complexity: O(n^2) worst case, faster in practice than plain Insertion Sort.
  */
 public class ShellSorter {
 
-    /**
-     * Sorts the resident list using the Shell Sort algorithm based on the provided Comparator.
-     * 
-     * @param list The list of residents to sort
-     * @param comparator The rule used to compare two residents
-     * @return A new sorted ArrayList
-     */
-    public ArrayList<Resident> shellSort(ArrayList<Resident> list, Comparator<Resident> comparator) {
-        // Create a copy so we don't modify the original list
-        ArrayList<Resident> sorted = new ArrayList<>(list);
-        int n = sorted.size();
+    // Sorts a copy of the array using the comparator. Does not modify the original.
+    public Resident[] shellSort(Resident[] list, Comparator<Resident> comparator) {
+        Resident[] sorted = Arrays.copyOf(list, list.length);
+        int n = sorted.length;
 
-        // Gap starts at n/2 and halves each iteration
         for (int gap = n / 2; gap > 0; gap /= 2) {
-
-            // Do a gapped insertion sort for this gap size
             for (int i = gap; i < n; i++) {
-                Resident temp = sorted.get(i);
+                Resident temp = sorted[i];
                 int j = i;
 
-                // Shift elements using the comparator
-                // comparator.compare(a, b) > 0 means 'a' should come after 'b'
-                while (j >= gap && comparator.compare(sorted.get(j - gap), temp) > 0) {
-                    sorted.set(j, sorted.get(j - gap));
+                // shift elements right until we find the right spot for temp
+                while (j >= gap && comparator.compare(sorted[j - gap], temp) > 0) {
+                    sorted[j] = sorted[j - gap];
                     j -= gap;
                 }
 
-                // Place 'temp' at its correct position
-                sorted.set(j, temp);
+                sorted[j] = temp;
             }
         }
 

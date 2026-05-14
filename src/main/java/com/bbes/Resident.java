@@ -6,7 +6,7 @@ package com.bbes;
  */
 public class Resident {
 
-    // ==================== Fields ====================
+    // fields
     private int residentId;
     private String fullName;
     private int age;
@@ -23,7 +23,7 @@ public class Resident {
     private boolean childOfSoloParent;
     private boolean childOfOfwOwwa;
 
-    // ==================== Constructor ====================
+    // constructor
     public Resident(
             int residentId, String fullName, int age, double householdIncome,
             int familySize, String occupation, boolean student, boolean unemployed,
@@ -48,7 +48,7 @@ public class Resident {
         this.childOfOfwOwwa = childOfOfwOwwa;
     }
 
-    // ==================== Getters ====================
+    // getters
     public int getResidentId() {
         return residentId;
     }
@@ -109,7 +109,7 @@ public class Resident {
         return childOfOfwOwwa;
     }
 
-    // ==================== Display ====================
+    // display / toString
 
     /**
      * Returns a formatted string showing all resident details.
